@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    background-color: #12211c;
+    background-image:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(227, 162, 60, 0.08), transparent 60%),
+      radial-gradient(ellipse 700px 500px at 100% 0%, rgba(76, 107, 138, 0.10), transparent 55%);
+    background-attachment: fixed;
+  }
+  h1, h2, h3, .font-display {
+    font-family: "Fraunces", ui-serif, Georgia, serif;
+  }
+}
+
+@layer components {
+  /* Flat ledger-style panel: left accent border instead of rounded SaaS card */
+  .panel {
+    @apply bg-ink-800/70 border border-ink-border rounded-sm;
+  }
+  .panel-accent {
+    @apply border-l-4;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 bg-marigold-500 text-ink-950 font-semibold
+           px-5 py-2.5 rounded-sm hover:bg-marigold-400 active:bg-marigold-600
+           transition-colors disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 bg-transparent border border-ink-border
+           text-bone-100 font-medium px-5 py-2.5 rounded-sm hover:border-marigold-500 hover:text-marigold-400
+           transition-colors disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  .label-caps {
+    @apply text-xs uppercase tracking-[0.14em] text-bone-500 font-medium;
+  }
+  .input-field {
+    @apply w-full bg-ink-900 border border-ink-border rounded-sm px-3.5 py-2.5 text-bone-100
+           placeholder:text-bone-500 focus:outline-none focus:border-marigold-500 transition-colors;
+  }
+}
+
+/* Subtle dotted rule motif — evokes a woven pattern without being literal */
+.woven-rule {
+  height: 1px;
+  background-image: linear-gradient(to right, rgba(159, 176, 168, 0.35) 33%, transparent 0%);
+  background-size: 6px 1px;
+  background-repeat: repeat-x;
+}
