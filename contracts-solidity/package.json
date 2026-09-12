@@ -1,0 +1,25 @@
+{
+  "name": "baraza-protocol-contracts",
+  "version": "1.0.0",
+  "description": "Solidity contracts for Baraza Protocol — dispute escrow, chama registry, and soulbound reputation, deployed on Arbitrum.",
+  "private": true,
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "test:gas": "REPORT_GAS=true hardhat test",
+    "deploy:sepolia": "hardhat run scripts/deploy.js --network arbitrumSepolia",
+    "deploy:local": "hardhat run scripts/deploy.js --network localhost",
+    "node": "hardhat node",
+    "verify:sepolia": "hardhat verify --network arbitrumSepolia"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "dotenv": "^16.4.5",
+    "hardhat": "^2.22.5"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.2",
+    "ethers": "^6.17.0",
+    "solc": "^0.8.24"
+  }
+}
