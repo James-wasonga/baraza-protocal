@@ -202,7 +202,7 @@ async function hashFile(file) {
 export default function FileDispute() {
   const navigate = useNavigate();
   const { address, connect } = useWallet();
-  const { configured, disputeEscrow, barazaRegistry, withSigner } = useContracts();
+  const { configured, disputeEscrow, barazaRegistry, withSigner, getFeeOverrides } = useContracts();
 
   const [circleId, setCircleId] = useState(sampleCircles[0]?.id ?? 1);
   const [members, setMembers] = useState(sampleCircles[0]?.members ?? []);
@@ -275,12 +275,14 @@ export default function FileDispute() {
     try {
       const contract = await withSigner(disputeEscrow);
       const evidenceHashes = evidenceFiles.map((f) => f.hash);
+      const overrides = getFeeOverrides();
       const tx = await contract.fileDispute(
         circleId,
         respondent,
         parseEther(bondAmount),
         summary,
-        evidenceHashes
+        evidenceHashes,
+        overrides
       );
       const receipt = await tx.wait();
       const event = receipt.logs
@@ -422,7 +424,8 @@ export default function FileDispute() {
           onNativePay={async () => {
             if (configured && disputeEscrow && filedId) {
               const contract = await withSigner(disputeEscrow);
-              await (await contract.postBondNative(filedId, { value: parseEther(bondAmount) })).wait();
+              const overrides = await getFeeOverrides();
+              await (await contract.postBondNative(filedId, { value: parseEther(bondAmount), ...overrides })).wait();
             }
             navigate(configured && filedId ? `/disputes/${filedId}` : "/disputes");
           }}

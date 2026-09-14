@@ -45,5 +45,29 @@ export function useContracts() {
     [getSigner]
   );
 
-  return { configured, address, disputeEscrow, barazaRegistry, reputationSBT, withSigner };
+    /// Arbitrum Sepolia's base fee can shift between the moment a wallet
+  /// estimates gas and the moment the transaction actually lands — ethers'
+  /// default estimate has been observed landing just barely under the
+  /// current base fee, which the sequencer then rejects outright ("max fee
+  /// per gas less than block base fee"). Fetching fresh fee data right
+  /// before sending and adding a real buffer (50% over the current base
+  /// fee, plus a bumped priority fee) fixes this rather than asking the
+  /// user to manually override gas in MetaMask on every transaction.
+  const getFeeOverrides = useCallback(
+    async (multiplier = 1.5) => {
+      if (!provider) return {};
+      const feeData = await provider.getFeeData();
+      if (!feeData.maxFeePerGas) return {}; // legacy/non-EIP-1559 network — let the wallet decide
+      const bump = (value) => (value * BigInt(Math.round(multiplier * 100))) / 100n;
+      return {
+        maxFeePerGas: bump(feeData.maxFeePerGas),
+        maxPriorityFeePerGas: feeData.maxPriorityFeePerGas
+          ? bump(feeData.maxPriorityFeePerGas)
+          : undefined,
+      };
+    },
+    [provider]
+  );
+
+  return { configured, address, disputeEscrow, barazaRegistry, reputationSBT, withSigner, getFeeOverrides };
 }
