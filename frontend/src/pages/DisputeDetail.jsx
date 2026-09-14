@@ -9,7 +9,7 @@ import { sampleDisputes, sampleJury, sampleEvidence } from "../lib/sampleData.js
 export default function DisputeDetail() {
   const { id } = useParams();
   const { address, connect } = useWallet();
-  const { configured, disputeEscrow, withSigner } = useContracts();
+  const { configured, disputeEscrow, withSigner, getFeeOverrides } = useContracts();
   const [voting, setVoting] = useState(false);
   const [voteError, setVoteError] = useState(null);
   const [localVote, setLocalVote] = useState(null);
@@ -32,6 +32,7 @@ export default function DisputeDetail() {
       if (configured && disputeEscrow) {
         const contract = await withSigner(disputeEscrow);
         const voteEnum = choice === "Claimant" ? 1 : 2;
+        const overrides = await getFeeOverrides();
         await (await contract.castVote(dispute.id, voteEnum)).wait();
       }
       setLocalVote(choice);
