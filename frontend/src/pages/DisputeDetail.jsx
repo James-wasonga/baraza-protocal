@@ -33,7 +33,7 @@ export default function DisputeDetail() {
         const contract = await withSigner(disputeEscrow);
         const voteEnum = choice === "Claimant" ? 1 : 2;
         const overrides = await getFeeOverrides();
-        await (await contract.castVote(dispute.id, voteEnum)).wait();
+        await (await contract.castVote(dispute.id, voteEnum, overrides)).wait();
       }
       setLocalVote(choice);
     } catch (e) {

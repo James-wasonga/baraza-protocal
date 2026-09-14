@@ -95,7 +95,7 @@ export default function FileDispute() {
     try {
       const contract = await withSigner(disputeEscrow);
       const evidenceHashes = evidenceFiles.map((f) => f.hash);
-      const overrides = getFeeOverrides();
+      const overrides = await getFeeOverrides();
       const tx = await contract.fileDispute(
         circleId,
         respondent,
