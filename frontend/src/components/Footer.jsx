@@ -17,7 +17,7 @@ export default function Footer() {
             Arbiscan (Sepolia)
           </a>
           <a
-            href="https://docs.arbitrum.io/stylus/stylus-content-map"
+            href="https://docs.arbitrum.io/stylus"
             target="_blank"
             rel="noreferrer"
             className="hover:text-marigold-400 transition-colors"

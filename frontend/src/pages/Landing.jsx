@@ -27,11 +27,11 @@ export default function Landing() {
               Browse open disputes
             </Link>
           </div>
-          <div className="flex flex-wrap gap-x-8 gap-y-3 mt-10 text-sm">
+          {/* <div className="flex flex-wrap gap-x-8 gap-y-3 mt-10 text-sm">
             <Stat label="Total disputes resolved" value="1" />
             <Stat label="Active circles" value="3" />
             <Stat label="Avg. resolution time" value="4.2 days" />
-          </div>
+          </div> */}
         </div>
         <div className="panel p-8 flex flex-col items-center">
           <JuryCircle jurors={sampleJury} />
