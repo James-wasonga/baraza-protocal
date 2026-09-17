@@ -120,3 +120,79 @@ not just asserting:
 - **Frontend**: production build (`npm run build`) completes with no errors.
 
 Nothing above was skipped or asserted without running it.
+
+---
+
+## Setup & local development
+
+### Prerequisites
+
+- Node.js 18+
+- npm
+- (Optional, for the real Stylus contract) Rust via `rustup` and
+  `cargo-stylus` — see `contracts-stylus/README.md`
+
+### 1. Solidity contracts
+
+```bash
+cd contracts-solidity
+npm install
+npm run compile          # via solc-js if binaries.soliditylang.org is blocked on your network:
+node verify-compile.js   # alternate compile path that doesn't need that host
+```
+
+Run the full lifecycle test against a live local chain:
+
+```bash
+npx hardhat node &        # start a local Arbitrum-like EVM
+node verify-runtime.js    # files a dispute, bonds, draws a jury, votes, resolves
+```
+
+Deploy to Arbitrum Sepolia:
+
+```bash
+cp .env.example .env      # fill in DEPLOYER_PRIVATE_KEY (funded with Sepolia ETH)
+npm run deploy:sepolia
+```
+
+This writes addresses to `contracts-solidity/deployments/arbitrumSepolia.json`
+and prints them — copy them into `backend/.env` and `frontend/.env` next.
+
+### 2. Stylus jury-selection contract (optional but recommended before a real deploy)
+
+```bash
+cd contracts-stylus
+cargo stylus check                      # validate against Stylus constraints
+cd algorithm-verification && cargo test # verify the pure algorithm (no Stylus toolchain needed)
+```
+
+Deploy per `contracts-stylus/README.md`, then set
+`STYLUS_JURY_SELECTOR_ADDRESS` in `contracts-solidity/.env` **before**
+running the Solidity deploy script, so `DisputeEscrow` wires to the real
+Stylus contract instead of the `MockJurySelector` fallback.
+
+### 3. Backend
+
+```bash
+cd backend
+npm install
+cp .env.example .env
+# Paste the deployed contract addresses from step 1, and a funded relayer
+# private key. Leave MOCK_MPESA=true unless you have real Daraja sandbox
+# credentials from https://developer.safaricom.co.ke
+npm run dev
+```
+
+Health check: `curl http://localhost:4000/api/health`
+
+### 4. Frontend
+
+```bash
+cd frontend
+npm install
+cp .env.example .env
+# Paste the same contract addresses. Leave blank to run in demo mode.
+npm run dev
+```
+
+Open `http://localhost:5173`.
