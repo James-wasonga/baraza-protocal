@@ -196,3 +196,15 @@ npm run dev
 ```
 
 Open `http://localhost:5173`.
+
+## Registration / submission notes
+
+- Networks supported per the contract configs: Arbitrum Sepolia (primary
+  testnet target), Arbitrum One, Arbitrum Nova.
+- Sponsor technologies genuinely used, with justification (not
+  checkbox-stuffed):**Alchemy** and **OpenZeppelin** (AccessControl, ERC721, ReentrancyGuard
+  across all three Solidity contracts). ZeroDev-style account abstraction
+  is designed into the bond-posting flow (`confirmBondOffchain` /
+  `RELAYER_ROLE`) but not wired to a live ZeroDev SDK integration in this
+  build — see `backend/src/services/blockchainService.js` for the seam
+  where that plugs in.
