@@ -202,7 +202,7 @@ Open `http://localhost:5173`.
 - Networks supported per the contract configs: Arbitrum Sepolia (primary
   testnet target), Arbitrum One, Arbitrum Nova.
 - Sponsor technologies genuinely used, with justification (not
-  checkbox-stuffed):**Alchemy** and **OpenZeppelin** (AccessControl, ERC721, ReentrancyGuard
+  checkbox-stuffed):**Alchemy**  used as the Arbitrum Sepolia RPC provider for contract deployment and all backend chain reads/write and **OpenZeppelin** (AccessControl, ERC721, ReentrancyGuard
   across all three Solidity contracts). ZeroDev-style account abstraction
   is designed into the bond-posting flow (`confirmBondOffchain` /
   `RELAYER_ROLE`) but not wired to a live ZeroDev SDK integration in this
