@@ -3,6 +3,8 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./BarazaRegistry.sol";
 import "./ReputationSBT.sol";
 import "./IJurySelector.sol";
@@ -14,13 +16,19 @@ import "./IJurySelector.sol";
 ///         outcome — forfeiting the losing party's bond and updating both
 ///         parties' on-chain reputation.
 ///
-/// @dev Bonds can arrive two ways, both ending at the same on-chain state:
-///        1. Directly in native currency via `postBondNative` (crypto-native users).
-///        2. Off-chain via M-Pesa, confirmed on-chain by the backend relayer
+/// @dev Bonds can be posted three ways, all converging on the same on-chain
+///      state (`Dispute.bondToken` records which):
+///        1. Native ETH via `postBondNative` (crypto-native users).
+///        2. An allowlisted ERC-20 stablecoin (e.g. USDG) via
+///           `postBondERC20` — lets a bond hold a predictable dollar value
+///           instead of floating with ETH's price.
+///        3. Off-chain via M-Pesa, confirmed on-chain by the backend relayer
 ///           calling `confirmBondOffchain` after Safaricom Daraja confirms
-///           payment — this is what powers gasless, non-crypto-native filing
-///           through ZeroDev account abstraction on the frontend.
+///           payment — this is what powers gasless, non-crypto-native
+///           filing through account abstraction on the frontend
 contract DisputeEscrow is AccessControl, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
     bytes32 public constant RELAYER_ROLE = keccak256("RELAYER_ROLE");     // backend M-Pesa relayer
     bytes32 public constant ARBITER_ADMIN_ROLE = keccak256("ARBITER_ADMIN_ROLE");
 
@@ -40,6 +48,7 @@ contract DisputeEscrow is AccessControl, ReentrancyGuard {
         address claimant;
         address respondent;
         uint256 bondAmount;         // required bond per party, in wei
+        address bondToken;           // address(0) for native ETH, else ERC-20 token
         bool claimantBonded;
         bool respondentBonded;
         uint256 filedAt;
@@ -58,6 +67,11 @@ contract DisputeEscrow is AccessControl, ReentrancyGuard {
     BarazaRegistry public immutable registry;
     ReputationSBT public immutable reputation;
 
+    /// @notice ERC-20 tokens that may be used as a bond currency. Gated by
+    ///         admin so a claimant can't file a dispute denominated in a
+    ///         scam token pretending to hold value.
+    mapping(address => bool) public allowedBondTokens;
+
     uint256 public constant DEFAULT_BOND_DEADLINE = 3 days;
     uint256 public constant DEFAULT_VOTING_DEADLINE = 4 days;
     uint16 public constant PROTOCOL_FEE_BPS = 500; // 5% of loser's forfeited bond -> juror pool
@@ -67,7 +81,7 @@ contract DisputeEscrow is AccessControl, ReentrancyGuard {
     mapping(uint256 => mapping(address => Vote)) public voteOf;
     mapping(uint256 => mapping(address => bool)) public hasVoted;
 
-    event DisputeFiled(uint256 indexed disputeId, uint256 indexed circleId, address indexed claimant, address respondent, uint256 bondAmount, string summary);
+    event DisputeFiled(uint256 indexed disputeId, uint256 indexed circleId, address indexed claimant, address respondent, uint256 bondAmount, address bondToken, string summary);
     event BondPosted(uint256 indexed disputeId, address indexed party, bool viaMpesa);
     event EvidenceSubmitted(uint256 indexed disputeId, address indexed submitter, bytes32 evidenceHash);
     event JurySeeded(uint256 indexed disputeId, bytes32 seedCommitment);
@@ -76,6 +90,7 @@ contract DisputeEscrow is AccessControl, ReentrancyGuard {
     event DisputeResolved(uint256 indexed disputeId, Vote outcome, address winner, address loser);
     event DisputeDismissed(uint256 indexed disputeId);
     event DisputeExpired(uint256 indexed disputeId);
+    event BondTokenAllowlisted(address indexed token, bool allowed);
 
     error NotCircleMember();
     error InvalidStatus();
@@ -88,6 +103,8 @@ contract DisputeEscrow is AccessControl, ReentrancyGuard {
     error JurySizeInvalid();
     error TransferFailed();
     error WrongBondAmount();
+    error TokenNotAllowed();
+    error WrongBondPath();
 
     constructor(address admin, address registryAddr, address reputationAddr, address jurySelectorAddr) {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
@@ -99,16 +116,28 @@ contract DisputeEscrow is AccessControl, ReentrancyGuard {
     }
 
     // ---------------------------------------------------------------------
+    // Admin: bond-token allowlist
+    // ---------------------------------------------------------------------
+
+    function setAllowedBondToken(address token, bool allowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        allowedBondTokens[token] = allowed;
+        emit BondTokenAllowlisted(token, allowed);
+    }
+
+    // ---------------------------------------------------------------------
     // Filing
     // ---------------------------------------------------------------------
 
     /// @notice File a dispute against another member of the same circle.
-    /// @dev The claimant's bond is posted separately (native or M-Pesa) so
-    ///      gasless flows can file first, then confirm payment async.
+    /// @dev The claimant's bond is posted separately (native, ERC-20, or
+    ///      M-Pesa) so gasless flows can file first, then confirm payment async.
+    /// @param bondToken address(0) for a native-ETH bond, or an allowlisted
+    ///        ERC-20 token address (e.g. USDG) for a stablecoin bond.
     function fileDispute(
         uint256 circleId,
         address respondent,
         uint256 bondAmount,
+        address bondToken,
         string calldata summary,
         bytes32[] calldata initialEvidence
     ) external returns (uint256 disputeId) {
@@ -116,12 +145,15 @@ contract DisputeEscrow is AccessControl, ReentrancyGuard {
             revert NotCircleMember();
         }
 
+        if (bondToken != address(0) && !allowedBondTokens[bondToken]) revert TokenNotAllowed();
+
         disputeId = _nextDisputeId++;
         Dispute storage d = _disputes[disputeId];
         d.circleId = circleId;
         d.claimant = msg.sender;
         d.respondent = respondent;
         d.bondAmount = bondAmount;
+        d.bondToken = bondToken;
         d.filedAt = block.timestamp;
         d.bondDeadline = block.timestamp + DEFAULT_BOND_DEADLINE;
         d.status = Status.Filed;
@@ -135,7 +167,7 @@ contract DisputeEscrow is AccessControl, ReentrancyGuard {
         reputation.ensureProfile(msg.sender);
         reputation.ensureProfile(respondent);
 
-        emit DisputeFiled(disputeId, circleId, msg.sender, respondent, bondAmount, summary);
+        emit DisputeFiled(disputeId, circleId, msg.sender, respondent, bondAmount, bondToken, summary);
     }
 
     // ---------------------------------------------------------------------
@@ -145,10 +177,25 @@ contract DisputeEscrow is AccessControl, ReentrancyGuard {
     function postBondNative(uint256 disputeId) external payable nonReentrant {
         Dispute storage d = _disputes[disputeId];
         if (d.status != Status.Filed) revert InvalidStatus();
+        if (d.bondToken !=address(0)) revert WrongBondPath();
         if (msg.sender != d.claimant && msg.sender != d.respondent) revert NotAParty();
         if (msg.value != d.bondAmount) revert WrongBondAmount();
         _markBonded(disputeId, msg.sender, false);
     }
+
+    /// @notice Post a bond in the dispute's chosen ERC-20 token (e.g. USDG).
+    ///         Caller must have already called `approve()` on the token for
+    ///         at least `bondAmount`.
+    function postBondERC20(uint256 disputeId) external nonReentrant {
+        Dispute storage d = _disputes[disputeId];
+        if (d.status != Status.Filed) revert InvalidStatus();
+        if (d.bondToken == address(0)) revert WrongBondPath();
+        if (msg.sender != d.claimant && msg.sender != d.respondent) revert NotAParty();
+
+        IERC20(d.bondToken).safeTransferFrom(msg.sender, address(this), d.bondAmount);
+        _markBonded(disputeId, msg.sender, false);
+    }
+
 
     /// @notice Called by the trusted backend relayer once Safaricom Daraja
     ///         confirms an M-Pesa STK Push for this dispute's bond. The bond
@@ -188,10 +235,11 @@ contract DisputeEscrow is AccessControl, ReentrancyGuard {
         if (d.status != Status.Filed) revert InvalidStatus();
 
         d.status = Status.Dismissed;
-        if (d.claimantBonded && address(this).balance >= d.bondAmount) {
-            (bool ok, ) = d.claimant.call{value: d.bondAmount}("");
-            if (!ok) revert TransferFailed();
-        }
+        // if (d.claimantBonded && address(this).balance >= d.bondAmount) {
+        //     (bool ok, ) = d.claimant.call{value: d.bondAmount}("");
+        //     if (!ok) revert TransferFailed();
+        // }
+        if (d.claimantBonded) _refund(d.claimant, d.bondToken, d.bondAmount);
         emit DisputeDismissed(disputeId);
     }
 
@@ -202,13 +250,31 @@ contract DisputeEscrow is AccessControl, ReentrancyGuard {
         if (block.timestamp <= d.bondDeadline) revert BondDeadlinePassed();
 
         d.status = Status.Expired;
-        if (d.claimantBonded && address(this).balance >= d.bondAmount) {
-            (bool ok, ) = d.claimant.call{value: d.bondAmount}("");
-            if (!ok) revert TransferFailed();
-        }
+        // if (d.claimantBonded && address(this).balance >= d.bondAmount) {
+        //     (bool ok, ) = d.claimant.call{value: d.bondAmount}("");
+        //     if (!ok) revert TransferFailed();
+        // }
+        // // Non-response is itself informative: dock a small reputation penalty.
+        // reputation.adjustScore(d.respondent, -15, "missed-bond-deadline");
+        // emit DisputeExpired(disputeId);
+        if (d.claimantBonded) _refund(d.claimant, d.bondToken, d.bondAmount);
         // Non-response is itself informative: dock a small reputation penalty.
         reputation.adjustScore(d.respondent, -15, "missed-bond-deadline");
         emit DisputeExpired(disputeId);
+    }
+
+    /// @dev Refunds in whichever asset the dispute was bonded in.
+    function _refund(address to, address token, uint256 amount) internal {
+        if (token == address(0)) {
+            if (address(this).balance >= amount) {
+                (bool ok, ) = to.call{value: amount}("");
+                if (!ok) revert TransferFailed();
+            }
+        } else {
+            if (IERC20(token).balanceOf(address(this)) >= amount) {
+                IERC20(token).safeTransfer(to, amount);
+            }
+        }
     }
 
     // ---------------------------------------------------------------------
@@ -255,6 +321,12 @@ contract DisputeEscrow is AccessControl, ReentrancyGuard {
 
         for (uint256 i = 0; i < selected.length; i++) {
             d.jury.push(selected[i]);
+            // Defense-in-depth: resolution later touches every juror's
+            // reputation profile. If the pool was ever assembled from
+            // something other than confirmed circle members, an unminted
+            // profile here would make _resolve() revert permanently,
+            // stranding the dispute (and both bonds) in Voting forever.
+            reputation.ensureProfile(selected[i]);
         }
         d.status = Status.Voting;
         d.votingDeadline = block.timestamp + DEFAULT_VOTING_DEADLINE;
@@ -317,12 +389,19 @@ contract DisputeEscrow is AccessControl, ReentrancyGuard {
         uint256 fee = (pot * PROTOCOL_FEE_BPS) / 10_000;
         uint256 payout = pot - fee;
 
-        if (address(this).balance >= payout) {
-            (bool ok, ) = winner.call{value: payout}("");
-            if (!ok) revert TransferFailed();
+        if (d.bondToken == address(0)) {
+            if (address(this).balance >= payout) {
+                (bool ok, ) = winner.call{value: payout}("");
+                if (!ok) revert TransferFailed();
+            }
+        } else {
+            if (IERC20(d.bondToken).balanceOf(address(this)) >= payout) {
+                IERC20(d.bondToken).safeTransfer(winner, payout);
+            }
         }
-        // `fee` remains in the contract as the juror reward pool, claimable
-        // off-chain via the backend's payout job (kept simple on-chain).
+        // `fee` remains in the contract (in whichever asset was bonded) as
+        // the juror reward pool, claimable off-chain via the backend's
+        // payout job.
 
         emit DisputeResolved(disputeId, outcome, winner, loser);
     }
@@ -344,13 +423,14 @@ contract DisputeEscrow is AccessControl, ReentrancyGuard {
         address claimant,
         address respondent,
         uint256 bondAmount,
+        address bondToken,
         Status status,
         string memory summary,
         uint256 votingDeadline,
         Vote outcome
     ) {
         Dispute storage d = _disputes[disputeId];
-        return (d.circleId, d.claimant, d.respondent, d.bondAmount, d.status, d.summary, d.votingDeadline, d.outcome);
+        return (d.circleId, d.claimant, d.respondent, d.bondAmount, d.bondToken, d.status, d.summary, d.votingDeadline, d.outcome);
     }
 
     function getJury(uint256 disputeId) external view returns (address[] memory) {

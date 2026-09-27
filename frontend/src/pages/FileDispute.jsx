@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { parseEther } from "ethers";
+import { parseEther, parseUnits, ZeroAddress } from "ethers";
 import { useWallet } from "../hooks/useWallet.jsx";
 import { useContracts } from "../hooks/useContracts.js";
 import { sampleCircles } from "../lib/sampleData.js";
+import { USDG_TOKEN_ADDRESS } from "../lib/config.js";
 import BondModal from "../components/BondModal.jsx";
 
 /// Hashes a File's actual bytes with SHA-256 (via the browser's built-in
@@ -22,12 +23,14 @@ async function hashFile(file) {
 export default function FileDispute() {
   const navigate = useNavigate();
   const { address, connect } = useWallet();
-  const { configured, disputeEscrow, barazaRegistry, withSigner, getFeeOverrides } = useContracts();
+  const { configured, disputeEscrow, barazaRegistry, usdgToken, withSigner, getFeeOverrides } = useContracts();
 
   const [circleId, setCircleId] = useState(sampleCircles[0]?.id ?? 1);
   const [members, setMembers] = useState(sampleCircles[0]?.members ?? []);
   const [respondent, setRespondent] = useState("");
+  const [bondCurrency, setBondCurrency] = useState("ETH"); // "ETH" | "USDG"
   const [bondAmount, setBondAmount] = useState("0.01");
+  const [usdgDecimals, setUsdgDecimals] = useState(6); // Paxos USDG is 6 decimals; re-fetched below to confirm, not assumed
   const [summary, setSummary] = useState("");
   const [evidenceFiles, setEvidenceFiles] = useState([]); // [{ name, hash }]
   const [hashingFile, setHashingFile] = useState(false);
@@ -35,6 +38,23 @@ export default function FileDispute() {
   const [filedId, setFiledId] = useState(null);
   const [showBondModal, setShowBondModal] = useState(false);
   const [error, setError] = useState(null);
+
+  // Switching to USDG defaults the bond to a round dollar-ish amount,
+  // since 0.01 "USDG" would be an oddly tiny bond compared to 0.01 ETH.
+  useEffect(() => {
+    if (bondCurrency === "USDG" && bondAmount === "0.01") setBondAmount("10");
+    if (bondCurrency === "ETH" && bondAmount === "10") setBondAmount("0.01");
+  }, [bondCurrency]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Confirm USDG's real decimals from the token contract itself, rather
+  // than assuming — this is the only fully reliable way to know it.
+  useEffect(() => {
+    if (!usdgToken) return;
+    usdgToken
+      .decimals()
+      .then((d) => setUsdgDecimals(Number(d)))
+      .catch(() => {}); // keep the sane default (6) if the read fails
+  }, [usdgToken]);
 
   // Load this circle's members — from chain if configured, otherwise from
   // the same sample data the rest of the demo uses.
@@ -73,7 +93,9 @@ export default function FileDispute() {
   function removeEvidence(idx) {
     setEvidenceFiles((prev) => prev.filter((_, i) => i !== idx));
   }
-
+  function bondAmountUnits() {
+    return bondCurrency === "USDG" ? parseUnits(bondAmount, usdgDecimals) : parseEther(bondAmount);
+  }
   async function handleSubmit(e) {
     e.preventDefault();
     setError(null);
@@ -96,10 +118,13 @@ export default function FileDispute() {
       const contract = await withSigner(disputeEscrow);
       const evidenceHashes = evidenceFiles.map((f) => f.hash);
       const overrides = await getFeeOverrides();
+      const bondToken = bondCurrency === "USDG" ? USDG_TOKEN_ADDRESS : ZeroAddress;
       const tx = await contract.fileDispute(
         circleId,
         respondent,
-        parseEther(bondAmount),
+        bondAmountUnits(),
+        bondToken,
+        // parseEther(bondAmount),
         summary,
         evidenceHashes,
         overrides
@@ -170,10 +195,40 @@ export default function FileDispute() {
           </p>
         </Field>
 
-        <Field label="Bond amount (ETH, per party)" hint="Refunded in full if you win the dispute">
+        <Field label="Bond currency" hint="USDG keeps the bond's value stable; ETH is simpler if you already hold it">
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setBondCurrency("ETH")}
+              className={`flex-1 text-sm px-3 py-2.5 rounded-sm border transition-colors ${
+                bondCurrency === "ETH"
+                  ? "border-marigold-500 text-marigold-400 bg-ink-800"
+                  : "border-ink-border text-bone-500"
+              }`}
+            >
+              ETH
+            </button>
+            <button
+              type="button"
+              onClick={() => setBondCurrency("USDG")}
+              className={`flex-1 text-sm px-3 py-2.5 rounded-sm border transition-colors ${
+                bondCurrency === "USDG"
+                  ? "border-marigold-500 text-marigold-400 bg-ink-800"
+                  : "border-ink-border text-bone-500"
+              }`}
+            >
+              USDG
+            </button>
+          </div>
+        </Field>
+
+        <Field
+          label={`Bond amount (${bondCurrency}, per party)`}
+          hint="Refunded in full if you win the dispute"
+        >
           <input
             type="number"
-            step="0.001"
+            step={bondCurrency === "USDG" ? "1" : "0.001"}
             min="0"
             value={bondAmount}
             onChange={(e) => setBondAmount(e.target.value)}
@@ -234,7 +289,7 @@ export default function FileDispute() {
           {!address ? "Connect wallet to file" : submitting ? "Filing…" : "File dispute"}
         </button>
       </form>
-
+{/* 
       {showBondModal && (
         <BondModal
           disputeId={filedId}
@@ -248,6 +303,41 @@ export default function FileDispute() {
               await (await contract.postBondNative(filedId, { value: parseEther(bondAmount), ...overrides })).wait();
             }
             navigate(configured && filedId ? `/disputes/${filedId}` : "/disputes");
+          }}
+        />
+      )} */}
+            {showBondModal && (
+        <BondModal
+          disputeId={filedId}
+          party={address}
+          bondAmountEth={bondAmount}
+          bondCurrency={bondCurrency}
+          onClose={() => navigate(configured && filedId ? `/disputes/${filedId}` : "/disputes")}
+          onWalletPay={async () => {
+            if (!configured || !disputeEscrow || !filedId) {
+              navigate("/disputes");
+              return;
+            }
+            const overrides = await getFeeOverrides();
+            if (bondCurrency === "USDG") {
+              const escrowWithSigner = await withSigner(disputeEscrow);
+              const tokenWithSigner = await withSigner(usdgToken);
+              const amount = bondAmountUnits();
+              const approveTx = await tokenWithSigner.approve(
+                await disputeEscrow.getAddress(),
+                amount,
+                overrides
+              );
+              await approveTx.wait();
+              const postTx = await escrowWithSigner.postBondERC20(filedId, overrides);
+              await postTx.wait();
+            } else {
+              const contract = await withSigner(disputeEscrow);
+              await (
+                await contract.postBondNative(filedId, { value: bondAmountUnits(), ...overrides })
+              ).wait();
+            }
+            navigate(`/disputes/${filedId}`);
           }}
         />
       )}

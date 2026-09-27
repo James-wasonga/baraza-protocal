@@ -75,6 +75,7 @@ class BlockchainService {
       claimant: d.claimant,
       respondent: d.respondent,
       bondAmount: d.bondAmount.toString(),
+      bondToken: d.bondToken,
       status: Number(d.status),
       summary: d.summary,
       votingDeadline: Number(d.votingDeadline),

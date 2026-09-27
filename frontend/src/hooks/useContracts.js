@@ -1,8 +1,8 @@
 import { useCallback, useMemo } from "react";
 import { Contract } from "ethers";
 import { useWallet } from "./useWallet.jsx";
-import { CONTRACTS } from "../lib/config.js";
-import { DisputeEscrowABI, BarazaRegistryABI, ReputationSBTABI } from "../lib/abis.js";
+import { CONTRACTS, USDG_TOKEN_ADDRESS } from "../lib/config.js";
+import { DisputeEscrowABI, BarazaRegistryABI, ReputationSBTABI, ERC20ABI } from "../lib/abis.js";
 
 /**
  * Returns ready-to-call contract instances (read-only if no signer is
@@ -37,6 +37,24 @@ export function useContracts() {
     return new Contract(CONTRACTS.reputationSBT, ReputationSBTABI, provider);
   }, [provider, configured]);
 
+  /// USDG contract instance — always available (it's a public, permanent
+  /// token contract independent of whether Baraza's own contracts are
+  /// configured), used for balance/allowance reads and the approve() step.
+  // const usdgToken = useMemo(() => {
+  //   if (!provider) return null;
+  //   return new Contract(USDG_TOKEN_ADDRESS, ERC20ABI, provider);
+  // }, [provider]);
+
+  const usdgToken = useMemo(() => {
+    if (!provider || !USDG_TOKEN_ADDRESS) return null;
+    try {
+      return new Contract(USDG_TOKEN_ADDRESS, ERC20ABI, provider);
+    } catch (e) {
+      console.error("Failed to construct USDG contract instance:", e);
+      return null;
+    }
+  }, [provider]);
+
   const withSigner = useCallback(
     async (contract) => {
       const signer = await getSigner();
@@ -45,7 +63,7 @@ export function useContracts() {
     [getSigner]
   );
 
-    /// Arbitrum Sepolia's base fee can shift between the moment a wallet
+  /// Arbitrum Sepolia's base fee can shift between the moment a wallet
   /// estimates gas and the moment the transaction actually lands — ethers'
   /// default estimate has been observed landing just barely under the
   /// current base fee, which the sequencer then rejects outright ("max fee
@@ -69,5 +87,5 @@ export function useContracts() {
     [provider]
   );
 
-  return { configured, address, disputeEscrow, barazaRegistry, reputationSBT, withSigner, getFeeOverrides };
+  return { configured, address, disputeEscrow, barazaRegistry, reputationSBT, usdgToken,withSigner, getFeeOverrides };
 }

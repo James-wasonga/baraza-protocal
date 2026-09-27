@@ -17,11 +17,25 @@ const STEPS = {
  *   2. GET  /mpesa/status/:id    -> poll until status === "success"
  *   3. POST /mpesa/confirm-bond  -> backend relayer calls confirmBondOffchain on-chain
  */
-export default function BondModal({ disputeId, party, bondAmountEth, onClose, onNativePay }) {
+export default function BondModal({ disputeId, party, bondAmountEth, bondCurrency = "ETH", onClose, onWalletPay }) {
   const [step, setStep] = useState(STEPS.CHOOSE);
   const [phone, setPhone] = useState("");
   const [error, setError] = useState(null);
   const [txHash, setTxHash] = useState(null);
+  const [walletPaying, setWalletPaying] = useState(false);
+
+  async function handleWalletPay() {
+    setWalletPaying(true);
+    setError(null);
+    try {
+      await onWalletPay();
+    } catch (e) {
+      setError(e?.reason || e?.message || "Payment failed.");
+      setStep(STEPS.FAILED);
+    } finally {
+      setWalletPaying(false);
+    }
+  }
 
   async function sendStkPush() {
     setError(null);
@@ -79,9 +93,9 @@ export default function BondModal({ disputeId, party, bondAmountEth, onClose, on
         </button>
 
         <p className="label-caps mb-1">Post bond</p>
-        <h2 className="font-display text-xl text-bone-100 mb-5">{bondAmountEth} ETH equivalent</h2>
+        <h2 className="font-display text-xl text-bone-100 mb-5">{bondAmountEth} {bondCurrency}</h2>
 
-        {step === STEPS.CHOOSE && (
+        {/* {step === STEPS.CHOOSE && (
           <div className="space-y-3">
             <button onClick={() => setStep(STEPS.PHONE)} className="btn-primary w-full">
               Pay with M-Pesa
@@ -89,6 +103,28 @@ export default function BondModal({ disputeId, party, bondAmountEth, onClose, on
             <button onClick={onNativePay} className="btn-secondary w-full">
               Pay with connected wallet
             </button>
+            <p className="text-xs text-bone-500 pt-1">
+              M-Pesa bonds are confirmed on-chain by the Baraza relayer once Safaricom Daraja
+              confirms your payment — no gas or seed phrase needed.
+            </p>
+          </div>
+        )} */}
+
+{step === STEPS.CHOOSE && (
+          <div className="space-y-3">
+            <button onClick={handleWalletPay} disabled={walletPaying} className="btn-primary w-full">
+              {walletPaying ? "Confirming in wallet…" : `Pay with connected wallet (${bondCurrency})`}
+            </button>
+            {bondCurrency === "USDG" && (
+              <p className="text-xs text-bone-500 -mt-1">
+                USDG needs two confirmations: an approval, then the bond itself.
+              </p>
+            )}
+            {bondCurrency === "ETH" && (
+              <button onClick={() => setStep(STEPS.PHONE)} className="btn-secondary w-full">
+                Pay with M-Pesa instead
+              </button>
+            )}
             <p className="text-xs text-bone-500 pt-1">
               M-Pesa bonds are confirmed on-chain by the Baraza relayer once Safaricom Daraja
               confirms your payment — no gas or seed phrase needed.
@@ -139,7 +175,7 @@ export default function BondModal({ disputeId, party, bondAmountEth, onClose, on
         {step === STEPS.FAILED && (
           <div className="py-4 text-center space-y-3">
             <p className="text-sm text-rust-500">{error}</p>
-            <button onClick={() => setStep(STEPS.PHONE)} className="btn-secondary">
+            <button onClick={() => setStep(STEPS.CHOOSE)} className="btn-secondary">
               Try again
             </button>
           </div>
