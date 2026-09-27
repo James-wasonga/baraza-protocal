@@ -99,8 +99,11 @@ async function main() {
 
   const bondAmount = ethers.parseEther("0.01");
   const evidence = ethers.keccak256(ethers.toUtf8Bytes("evidence-1"));
+  // await (await escrow.connect(claimant).fileDispute(
+  //   1, respondent.address, bondAmount, "Respondent did not deliver goods paid for in round 4", [evidence]
+  // )).wait();
   await (await escrow.connect(claimant).fileDispute(
-    1, respondent.address, bondAmount, "Respondent did not deliver goods paid for in round 4", [evidence]
+    1, respondent.address, bondAmount, ethers.ZeroAddress, "Respondent did not deliver goods paid for in round 4", [evidence]
   )).wait();
   console.log("Dispute #1 filed");
 
@@ -148,7 +151,7 @@ async function main() {
 
   // Non-member filing check
   try {
-    await (await escrow.connect(outsider).fileDispute(1, respondent.address, bondAmount, "n/a", [])).wait();
+    await (await escrow.connect(outsider).fileDispute(1, respondent.address, bondAmount, ethers.ZeroAddress, "n/a", [])).wait();
     console.log("❌ Outsider filing should have reverted but did not!");
     process.exitCode = 1;
     return;

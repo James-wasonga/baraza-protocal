@@ -20,5 +20,16 @@ export const ARBITRUM_SEPOLIA = {
   blockExplorerUrls: ["https://sepolia.arbiscan.io"],
 };
 
+// export const DISPUTE_STATUS = ["Filed", "AwaitingJury", "Voting", "Resolved", "Dismissed", "Expired"];
+// export const VOTE_LABEL = ["None", "Claimant", "Respondent"];
+
+// USDG (Global Dollar Network, issued by Paxos) — official Arbitrum Sepolia
+// testnet address per docs.paxos.com/guides/stablecoin/usdg/testnet.
+// Bonds can be posted in this token instead of native ETH, once it's
+// allowlisted on the deployed DisputeEscrow (the deploy script does this
+// automatically when USDG_TOKEN_ADDRESS is set).
+export const USDG_TOKEN_ADDRESS =
+  import.meta.env.VITE_USDG_TOKEN_ADDRESS || "0xFFC95faa3d63Cde504a05B567C600B78C0b41892";
+
 export const DISPUTE_STATUS = ["Filed", "AwaitingJury", "Voting", "Resolved", "Dismissed", "Expired"];
 export const VOTE_LABEL = ["None", "Claimant", "Respondent"];

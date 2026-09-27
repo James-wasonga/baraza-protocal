@@ -57,11 +57,28 @@ async function main() {
   await (await reputation.grantRole(ISSUER_ROLE, await escrow.getAddress())).wait();
   console.log("Granted ISSUER_ROLE to DisputeEscrow");
 
+  // const RELAYER_ROLE = await escrow.RELAYER_ROLE();
+  // const relayerAddress = process.env.RELAYER_ADDRESS || deployer.address;
+  // if (relayerAddress.toLowerCase() !== deployer.address.toLowerCase()) {
+  //   await (await escrow.grantRole(RELAYER_ROLE, relayerAddress)).wait();
+  //   console.log("Granted RELAYER_ROLE to", relayerAddress);
+  // }
+
   const RELAYER_ROLE = await escrow.RELAYER_ROLE();
   const relayerAddress = process.env.RELAYER_ADDRESS || deployer.address;
   if (relayerAddress.toLowerCase() !== deployer.address.toLowerCase()) {
     await (await escrow.grantRole(RELAYER_ROLE, relayerAddress)).wait();
     console.log("Granted RELAYER_ROLE to", relayerAddress);
+  }
+
+  // Allowlist USDG as a bond token if an address is configured for this
+  // network (see .env.example — official Paxos addresses per network).
+  const usdgAddress = process.env.USDG_TOKEN_ADDRESS;
+  if (usdgAddress) {
+    await (await escrow.setAllowedBondToken(usdgAddress, true)).wait();
+    console.log("Allowlisted USDG as a bond token:", usdgAddress);
+  } else {
+    console.log("USDG_TOKEN_ADDRESS not set — bonds will only be payable in native ETH or M-Pesa until you call setAllowedBondToken.");
   }
 
   const deployment = {
@@ -73,7 +90,8 @@ async function main() {
       BarazaRegistry: await registry.getAddress(),
       DisputeEscrow: await escrow.getAddress(),
       JurySelector: jurySelectorAddress
-    }
+    },
+    usdgToken: usdgAddress || null
   };
 
   const outDir = path.join(__dirname, "..", "deployments");

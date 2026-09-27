@@ -4,15 +4,15 @@
 // the read-heavy view functions too).
 
 const DisputeEscrowABI = [
-  "function fileDispute(uint256 circleId, address respondent, uint256 bondAmount, string summary, bytes32[] initialEvidence) returns (uint256)",
+  "function fileDispute(uint256 circleId, address respondent, uint256 bondAmount, address Token, string summary, bytes32[] initialEvidence) returns (uint256)",
   "function confirmBondOffchain(uint256 disputeId, address party)",
   "function commitJurySeed(uint256 disputeId, bytes32 seedCommitment)",
   "function revealAndSelectJury(uint256 disputeId, bytes32 seed, address[] pool, uint16[] weights, uint8 jurySize) returns (address[])",
-  "function getDispute(uint256 disputeId) view returns (uint256 circleId, address claimant, address respondent, uint256 bondAmount, uint8 status, string summary, uint256 votingDeadline, uint8 outcome)",
+  "function getDispute(uint256 disputeId) view returns (uint256 circleId, address claimant, address respondent, uint256 bondAmount, address bondToken, uint8 status, string summary, uint256 votingDeadline, uint8 outcome)",
   "function getJury(uint256 disputeId) view returns (address[])",
   "function getEvidence(uint256 disputeId) view returns (bytes32[])",
   "function getVoteTally(uint256 disputeId) view returns (uint8, uint8)",
-  "event DisputeFiled(uint256 indexed disputeId, uint256 indexed circleId, address indexed claimant, address respondent, uint256 bondAmount, string summary)",
+  "event DisputeFiled(uint256 indexed disputeId, uint256 indexed circleId, address indexed claimant, address respondent, uint256 bondAmount, address bondToken, string summary)",
   "event BondPosted(uint256 indexed disputeId, address indexed party, bool viaMpesa)",
   "event JurySelected(uint256 indexed disputeId, address[] jury)",
   "event DisputeResolved(uint256 indexed disputeId, uint8 outcome, address winner, address loser)"
