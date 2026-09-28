@@ -30,10 +30,10 @@ not a reimplementation of that — it targets a different user:
 
 | | Generic on-chain arbitration | Baraza Protocol |
 |---|---|---|
-| Bond currency | Crypto token stake | Mobile money (M-Pesa) or wallet |
+| Bond currency | Crypto token stake | M-Pesa, USDG stablecoin, or ETH |
 | Juror pool | Anonymous, global | Known members of your own circle |
-| Gas to file | Required | None (account-abstracted filing) |
-| Jury selection | Solidity loop | Stylus (Rust/WASM), reputation-weighted |
+| Gas to bond | Required | None via M-Pesa (gasless filing via ERC-4337 planned) |
+
 
 ---
 
@@ -66,7 +66,8 @@ that tooling is more mature there than Stylus's equivalent today.
 - **`BarazaRegistry.sol`** — registers circles (chamas, ROSCAs, trade
   partnerships) and their membership.
 - **`DisputeEscrow.sol`** — the core contract. Files disputes, escrows
-  bonds (native ETH or M-Pesa-confirmed-by-relayer), hands jury selection
+  bonds (native ETH, allowlisted ERC-20 such as Paxos USDG, or
+  M-Pesa-confirmed-by-relayer), hands jury selection
   to the Stylus contract, collects votes, settles the outcome.
 - **`IJurySelector.sol` / `contracts-stylus/`** — the Rust/Stylus contract.
   Commit-reveal, reputation-weighted random draw. See
@@ -109,6 +110,11 @@ not just asserting:
   filing, bonding, jury selection, voting, resolution, reputation-score
   updates, soulbound-transfer rejection, and non-member-filing rejection
   all pass against live contract calls, not just unit-test mocks.
+- **USDG bond path**: the full ERC-20 lifecycle (allowlist, file, approve,
+  bond, jury draw, vote, resolve, payout) is exercised against real
+  deployed bytecode by `contracts-solidity/verify-usdg-bond.js`, and the
+  original native-ETH lifecycle (`verify-runtime.js`) still passes
+  alongside it.
 - **Stylus jury-selection algorithm**: the core weighted-sampling logic is
   mirrored in a dependency-minimal crate (`contracts-stylus/algorithm-verification/`)
   and run through `cargo test` — determinism, no-duplicate-jurors, and the
@@ -144,8 +150,9 @@ node verify-compile.js   # alternate compile path that doesn't need that host
 Run the full lifecycle test against a live local chain:
 
 ```bash
-npx hardhat node &        # start a local Arbitrum-like EVM
+npx hardhat node          # leave running in its own terminal, start a local Arbitrum-like EVM
 node verify-runtime.js    # files a dispute, bonds, draws a jury, votes, resolves
+node verify-usdg-bond.js  # ERC-20/USDG bond lifecycle
 ```
 
 Deploy to Arbitrum Sepolia:
@@ -154,6 +161,9 @@ Deploy to Arbitrum Sepolia:
 cp .env.example .env      # fill in DEPLOYER_PRIVATE_KEY (funded with Sepolia ETH)
 npm run deploy:sepolia
 ```
+To redeploy only `DisputeEscrow` after a logic change (keeps the other
+three addresses), use `npm run redeploy-escrow:sepolia`. Set
+`USDG_TOKEN_ADDRESS` in `.env` first (see `.env.example`).
 
 This writes addresses to `contracts-solidity/deployments/arbitrumSepolia.json`
 and prints them — copy them into `backend/.env` and `frontend/.env` next.
@@ -201,10 +211,30 @@ Open `http://localhost:5173`.
 
 - Networks supported per the contract configs: Arbitrum Sepolia (primary
   testnet target), Arbitrum One, Arbitrum Nova.
-- Sponsor technologies genuinely used, with justification (not
-  checkbox-stuffed):**Alchemy**  used as the Arbitrum Sepolia RPC provider for contract deployment and all backend chain reads/write and **OpenZeppelin** (AccessControl, ERC721, ReentrancyGuard
-  across all three Solidity contracts). ZeroDev-style account abstraction
-  is designed into the bond-posting flow (`confirmBondOffchain` /
-  `RELAYER_ROLE`) but not wired to a live ZeroDev SDK integration in this
-  build — see `backend/src/services/blockchainService.js` for the seam
-  where that plugs in.
+- Sponsor technologies genuinely used: **OpenZeppelin** (AccessControl,
+  ERC721, ReentrancyGuard, SafeERC20 across the Solidity contracts),
+  **Alchemy** (Arbitrum Sepolia RPC provider for deployment and backend
+  chain reads/writes), and **Paxos USDG** (stablecoin bond currency).
+  ZeroDev-style account abstraction is designed into the bonding flow
+  (`confirmBondOffchain` / `RELAYER_ROLE`) but not integrated with a live
+  ZeroDev SDK — see `backend/src/services/blockchainService.js` for the
+  seam where it plugs in.
+
+
+  ## Live deployment
+
+- App: https://baraza-protocal.vercel.app
+- Contracts (Arbitrum Sepolia): see `contracts-solidity/deployments/arbitrumSepolia.json`
+  and https://sepolia.arbiscan.io
+
+## Known limitations
+
+- The Stylus SDK wrapper is written but not yet compiled or deployed; a
+  Solidity `MockJurySelector` runs the identical algorithm today.
+- Jury selection is triggered manually (`POST /api/disputes/:id/select-jury`);
+  an event listener to automate it isn't built yet.
+- There is no circle-creation page; circles are created via
+  `scripts/create-test-circle.js` or directly on the registry contract.
+- Dispute evidence is hashed in the browser, not stored; jurors receive
+  files directly from the parties.
+- M-Pesa runs in mock mode unless Daraja sandbox credentials are set.
