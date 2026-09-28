@@ -3,7 +3,7 @@
 // `npm run compile` in contracts-solidity to confirm nothing broke).
 
 export const DisputeEscrowABI = [
-  "function fileDispute(uint256 circleId, address respondent, uint256 bondAmount, addresss bondToken, string summary, bytes32[] initialEvidence) returns (uint256)",
+  "function fileDispute(uint256 circleId, address respondent, uint256 bondAmount, address bondToken, string summary, bytes32[] initialEvidence) returns (uint256)",
   "function postBondNative(uint256 disputeId) payable",
   "function postBondERC20(uint256 disputeId)",
   "function submitEvidence(uint256 disputeId, bytes32 evidenceHash)",
