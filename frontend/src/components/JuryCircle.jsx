@@ -1,4 +1,5 @@
 import React from "react";
+import { shortenAddress } from "../lib/address";
 
 /**
  * Renders the selected jury as a circle of seats around the dispute — a
@@ -56,7 +57,7 @@ export default function JuryCircle({ jurors = [], size = 260 }) {
               fill="#9FB0A8"
               fontFamily="IBM Plex Mono, monospace"
             >
-              {juror.address}
+              {shortenAddress(juror.address)}
             </text>
           </g>
         );

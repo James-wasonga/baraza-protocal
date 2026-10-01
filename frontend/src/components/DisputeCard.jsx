@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { shortenAddress } from "../lib/address";
 
 const STATUS_STYLE = {
   Filed: "text-dusk-400 border-dusk-500",
@@ -21,7 +22,8 @@ export default function DisputeCard({ dispute }) {
           <p className="label-caps mb-1">{dispute.circle}</p>
           <h3 className="text-bone-100 font-medium leading-snug truncate max-w-md">{dispute.summary}</h3>
           <p className="font-mono text-xs text-bone-500 mt-2">
-            {dispute.claimant} <span className="text-bone-500/60">vs</span> {dispute.respondent}
+            {shortenAddress(dispute.claimant)} <span className="text-bone-500/60">vs</span>{" "}
+            {shortenAddress(dispute.respondent)}
           </p>
         </div>
         <span
@@ -32,7 +34,7 @@ export default function DisputeCard({ dispute }) {
       </div>
       <div className="woven-rule my-4" />
       <div className="flex items-center justify-between text-xs text-bone-500">
-        <span>Bond: {dispute.bondAmountEth} ETH / party</span>
+        <span>Bond: {dispute.bondDisplay} / party</span>
         <span>Filed {dispute.filedAt}</span>
       </div>
     </Link>
