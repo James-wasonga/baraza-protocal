@@ -16,7 +16,7 @@ export default function Landing() {
           </h1>
           <p className="text-bone-300 text-lg leading-relaxed mb-8 max-w-xl">
             Baraza Protocol brings reputation-weighted, on-chain arbitration to chamas, ROSCAs,
-            and informal trade partnerships — piloted in East Africa, built for any trust
+            and informal trade partnerships, piloted in East Africa, built for any trust
             economy that runs on a handshake instead of a contract.
           </p>
           <div className="flex flex-wrap gap-3">
@@ -35,10 +35,10 @@ export default function Landing() {
         </div>
         <div className="panel p-8 flex flex-col items-center">
           <JuryCircle jurors={sampleJury} />
-          <p className="text-xs text-bone-500 mt-4 text-center max-w-xs">
+          {/* <p className="text-xs text-bone-500 mt-4 text-center max-w-xs">
             A dispute in <span className="text-bone-300">Kilimani Traders Chama</span> — 3 jurors
             drawn by reputation-weighted random selection, 2 votes cast.
-          </p>
+          </p> */}
         </div>
       </section>
 
