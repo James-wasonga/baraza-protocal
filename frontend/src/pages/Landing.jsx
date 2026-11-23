@@ -27,18 +27,9 @@ export default function Landing() {
               Browse open disputes
             </Link>
           </div>
-          {/* <div className="flex flex-wrap gap-x-8 gap-y-3 mt-10 text-sm">
-            <Stat label="Total disputes resolved" value="1" />
-            <Stat label="Active circles" value="3" />
-            <Stat label="Avg. resolution time" value="4.2 days" />
-          </div> */}
         </div>
         <div className="panel p-8 flex flex-col items-center">
           <JuryCircle jurors={sampleJury} />
-          {/* <p className="text-xs text-bone-500 mt-4 text-center max-w-xs">
-            A dispute in <span className="text-bone-300">Kilimani Traders Chama</span> — 3 jurors
-            drawn by reputation-weighted random selection, 2 votes cast.
-          </p> */}
         </div>
       </section>
 
