@@ -95,22 +95,7 @@ export default function BondModal({ disputeId, party, bondAmountEth, bondCurrenc
         <p className="label-caps mb-1">Post bond</p>
         <h2 className="font-display text-xl text-bone-100 mb-5">{bondAmountEth} {bondCurrency}</h2>
 
-        {/* {step === STEPS.CHOOSE && (
-          <div className="space-y-3">
-            <button onClick={() => setStep(STEPS.PHONE)} className="btn-primary w-full">
-              Pay with M-Pesa
-            </button>
-            <button onClick={onNativePay} className="btn-secondary w-full">
-              Pay with connected wallet
-            </button>
-            <p className="text-xs text-bone-500 pt-1">
-              M-Pesa bonds are confirmed on-chain by the Baraza relayer once Safaricom Daraja
-              confirms your payment — no gas or seed phrase needed.
-            </p>
-          </div>
-        )} */}
-
-{step === STEPS.CHOOSE && (
+        {step === STEPS.CHOOSE && (
           <div className="space-y-3">
             <button onClick={handleWalletPay} disabled={walletPaying} className="btn-primary w-full">
               {walletPaying ? "Confirming in wallet…" : `Pay with connected wallet (${bondCurrency})`}
